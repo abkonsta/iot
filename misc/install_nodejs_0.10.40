@@ -1,0 +1,7 @@
+# this script helps install an older version of node.js
+# which is supported by particle-cli
+
+ME=$(whoami) ; sudo chown -R $ME /usr/local && cd /usr/local/bin #adding yourself to the group to access /usr/local/bin
+mkdir _node && cd $_ && wget http://nodejs.org/dist/v0.10.40/node-v0.10.40-darwin-x64.tar.gz -O - | tar zxf - --strip-components=1
+ln -s "/usr/local/bin/_node/bin/node" .. # Making the symbolic link to node
+ln -s "/usr/local/bin/_node/lib/node_modules/npm/bin/npm-cli.js" ../npm ## making the symbolic link to npm
