@@ -4,47 +4,77 @@
 
 #include "LCD_Functions.h"
 
-int DS18S20_Pin = 3; //DS18S20 Signal pin on digital 2
+int DS18S20_Pin = 3; // DS18S20 Signal pin
 
-//Temperature chip i/o
-OneWire ds(DS18S20_Pin);  // on digital pin 2
+// Temperature chip i/o
+OneWire ds(DS18S20_Pin);
 char buffer[10];
-int sample = 1;
+int sample;
+unsigned long timer;
+float temp, lastTemp1, lastTemp2;
+char trend[10];
+bool hasTempHist;
     
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
   
-  lcdBegin(); // This will setup our pins, and initialize the LCD
-  updateDisplay(); // with displayMap untouched, SFE logo
-  setContrast(50); // Good values range from 40-60
-                    // had to update to 50, was too faint
-  delay(1000);   
+  lcdBegin();       // This will setup our pins, and initialize the LCD
+  updateDisplay();  // with displayMap untouched, SFE logo
+  setContrast(50);  // Good values range from 40-60
+  delay(500);       // had to update to 50, was too faint
+  
   clearDisplay(WHITE);
   updateDisplay();
-  
+	
+	// initialize globals
+	timer = millis();
+	sample = 1;
+	lastTemp1 = -100.0F;
+	lastTemp2 = -100.0F;
+	temp = 0.0F;
+	hasTempHist = false;
 }
 
 void loop() {
-    clearDisplay(WHITE);
+	
+	if(millis() - timer > 1500UL)
+	{
+		clearDisplay(WHITE);
 
-    float temperature = getTemp();
-
+		// if we don't have any temperature history, 
+		// do not print the trend
+		hasTempHist = (lastTemp1 != -100.0F && lastTemp2 != -100.0F);
     
+		// shift temps
+		lastTemp2 = lastTemp1;
+		lastTemp1 = temp;
+		temp = getTemp();
+	
+	  if(!hasTempHist)
+				strcpy(trend, "");
+		else if(lastTemp2 == lastTemp1 && lastTemp1 == temp)
+				strcpy(trend, "(steady)");
+		else if(lastTemp2 > lastTemp1 && lastTemp1 > temp)
+				strcpy(trend, "(falling)");
+		else if(lastTemp2 < lastTemp1 && lastTemp1 < temp)
+				strcpy(trend, "(rising)");
+			
     setStr("Temperature:", 0, 0, BLACK);
-    dtostrf(temperature, 3, 1, buffer);
+    dtostrf(temp, 3, 1, buffer);
     setStr(buffer, 0, 11, BLACK);
+    setStr(trend, 30, 11, BLACK);
 
     setStr("Sample: ", 0, 22, BLACK);
     itoa(sample, buffer, 10);
     setStr(buffer, 0, 33, BLACK);
-    
    
     updateDisplay();
-    Serial.println(temperature);
-    
-    delay(1000); //just here to slow down the output so it is easier to read
+    Serial.println(temp);
+
+		timer = millis();
     sample++;
+	}
 }
 
 float getTemp(){
