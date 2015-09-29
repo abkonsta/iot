@@ -8,10 +8,17 @@ int DS18S20_Pin = 3; // DS18S20 Signal pin
 
 // Temperature chip i/o
 OneWire ds(DS18S20_Pin);
-char buffer[10];
-int sample;
-unsigned long timer;
-float temp, lastTemp1, lastTemp2;
+char buffer[32];
+char temp[10];
+
+// sampling interval timer
+unsigned long sampleTimer;
+
+// trend timer (long, around 1 minute?)
+unsigned long trendTimer;
+
+float tempNow, tempJustBefore, tempLongAgo;
+
 char trend[10];
 bool hasTempHist;
     
@@ -28,53 +35,60 @@ void setup() {
   updateDisplay();
 	
 	// initialize globals
-	timer = millis();
-	sample = 1;
-	lastTemp1 = -100.0F;
-	lastTemp2 = -100.0F;
-	temp = 0.0F;
+	trendTimer = sampleTimer = millis();
+	tempNow = tempJustBefore = tempLongAgo = 0.0F;
 	hasTempHist = false;
 }
 
 void loop() {
 	
-	if(millis() - timer > 1500UL)
+	long currentTime = millis();
+
+	// if enough time has passed, get the temperature and update the LCD
+	if(currentTime - sampleTimer > 1500UL)
 	{
-		clearDisplay(WHITE);
-
-		// if we don't have any temperature history, 
-		// do not print the trend
-		hasTempHist = (lastTemp1 != -100.0F && lastTemp2 != -100.0F);
-    
-		// shift temps
-		lastTemp2 = lastTemp1;
-		lastTemp1 = temp;
-		temp = getTemp();
+		tempJustBefore = tempNow;
+		tempNow = getTemp();
 	
-	  if(!hasTempHist)
-				strcpy(trend, "");
-		else if(lastTemp2 == lastTemp1 && lastTemp1 == temp)
-				strcpy(trend, "(steady)");
-		else if(lastTemp2 > lastTemp1 && lastTemp1 > temp)
-				strcpy(trend, "(falling)");
-		else if(lastTemp2 < lastTemp1 && lastTemp1 < temp)
-				strcpy(trend, "(rising)");
-			
+		if(!hasTempHist)
+		{
+			tempJustBefore = tempNow;
+			tempLongAgo = tempNow;
+			hasTempHist = true;
+		}
+		
+	  if(tempJustBefore > tempNow)
+			sprintf(trend, "falling");
+	  else if(tempJustBefore < tempNow)
+			sprintf(trend, "rising");
+	  else if(tempLongAgo > tempNow)
+			sprintf(trend, "falling");
+	  else if(tempLongAgo < tempNow)
+			sprintf(trend, "rising");
+		else
+			sprintf(trend, "steady");	
+	
+		clearDisplay(WHITE);
     setStr("Temperature:", 0, 0, BLACK);
-    dtostrf(temp, 3, 1, buffer);
+		dtostrf(tempNow, 3, 1, temp);
+  	sprintf(buffer, "%s (%s)", temp, trend);
     setStr(buffer, 0, 11, BLACK);
-    setStr(trend, 30, 11, BLACK);
 
-    setStr("Sample: ", 0, 22, BLACK);
-    itoa(sample, buffer, 10);
+    setStr("Uptime: ", 0, 22, BLACK);
+		sprintf(buffer, "%d sec", millis() / 1000);
     setStr(buffer, 0, 33, BLACK);
    
     updateDisplay();
-    Serial.println(temp);
+    Serial.println(tempNow);
 
-		timer = millis();
-    sample++;
+		sampleTimer = currentTime;
 	}
+
+	// if 1 minute passed, update the trend temp
+	if(currentTime - trendTimer > 60000UL)
+	{
+		tempLongAgo = tempNow;
+	}	
 }
 
 float getTemp(){
