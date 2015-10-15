@@ -1,5 +1,5 @@
 function startup()
-	print('in startup')
+	print('Boot wait period done. Starting up...')
 	dofile('script1.lua')
 end
 		
